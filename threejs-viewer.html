@@ -106,6 +106,18 @@
                     model.scale.multiplyScalar(2 / maxAxis);
                     console.log(`Модель масштабирована до: (${model.scale.x}, ${model.scale.y}, ${model.scale.z})`);
 
+                    // Изменение цвета модели на #D7DADE
+                    model.traverse(function(child) {
+                        if (child.isMesh) {
+                            if (child.material) {
+                                child.material.color.set('#D7DADE');
+                                // Если материалы используют карты или другие свойства, может потребоваться их обновление
+                                child.material.needsUpdate = true;
+                            }
+                        }
+                    });
+                    console.log('Цвет модели изменён на #D7DADE');
+
                     scene.add(model);
                     console.log('Модель добавлена в сцену');
 
@@ -149,13 +161,17 @@
             function animate() {
                 requestAnimationFrame(animate);
 
+                // Обновляем целевые значения вращения
                 targetX = mouseX * 0.1;
                 targetY = mouseY * 0.1;
 
                 if (model) {
-                    // Плавное вращение модели в зависимости от позиции мыши
+                    // Плавное вращение модели в сторону мыши
                     model.rotation.y += 0.05 * (targetX - model.rotation.y);
                     model.rotation.x += 0.05 * (targetY - model.rotation.x);
+
+                    // Ограничение вращения по оси X для предотвращения переворота модели
+                    model.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, model.rotation.x));
 
                     // Логирование текущих углов поворота модели
                     console.log(`Model rotation: X=${model.rotation.x.toFixed(2)}, Y=${model.rotation.y.toFixed(2)}`);
