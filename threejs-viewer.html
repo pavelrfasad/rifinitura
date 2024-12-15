@@ -5,17 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Model Viewer</title>
     <style>
+        /* Убираем отступы и задаём размеры */
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
-            background-color: #000000; /* Чёрный фон */
+            background-color: transparent; /* Прозрачный фон */
             overflow: hidden;
         }
+        /* Контейнер для Three.js */
         #threejs-container {
             width: 100%;
             height: 100%;
+            position: relative;
         }
     </style>
 </head>
@@ -41,7 +44,7 @@
 
             // Создаём сцену
             const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x000000); // Чёрный фон
+            scene.background = new THREE.Color(0x000000); // Цвет фона (не важен, так как renderer прозрачный)
             console.log('Сцена создана');
 
             // Создаём камеру
@@ -52,33 +55,53 @@
                 1000
             );
             camera.position.set(0, 0, 5); // Отдаление камеры для обзора модели
-            console.log(`Камера создана с позицией: ${camera.position.x}, ${camera.position.y}, ${camera.position.z}`);
+            console.log(`Камера создана с позицией: X=${camera.position.x}, Y=${camera.position.y}, Z=${camera.position.z}`);
 
-            // Создаём рендерер
+            // Создаём рендерер с прозрачным фоном и включённым теневым картированием
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setClearColor(0x000000, 0); // Прозрачный фон
+            renderer.shadowMap.enabled = true; // Включаем тени
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Тип теней
             container.appendChild(renderer.domElement);
             console.log('Рендерер создан и добавлен в контейнер');
 
             // Добавляем освещение
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Мягкий свет
             scene.add(ambientLight);
             console.log('AmbientLight добавлен в сцену');
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-            directionalLight.position.set(10, 10, 10);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 10, 7.5);
+            directionalLight.castShadow = true; // Разрешаем отбрасывание теней
+            directionalLight.shadow.camera.top = 10;
+            directionalLight.shadow.camera.bottom = -10;
+            directionalLight.shadow.camera.left = -10;
+            directionalLight.shadow.camera.right = 10;
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
             scene.add(directionalLight);
             console.log('DirectionalLight добавлен в сцену');
 
-            // Добавляем вспомогательные оси
+            // Добавляем вспомогательные оси (опционально)
             const axesHelper = new THREE.AxesHelper(5);
             scene.add(axesHelper);
             console.log('AxesHelper добавлен в сцену');
 
-            // Добавляем сетку
+            // Добавляем сетку (опционально)
             const gridHelper = new THREE.GridHelper(10, 10);
             scene.add(gridHelper);
             console.log('GridHelper добавлен в сцену');
+
+            // Создаём плоскость для приёма теней
+            const planeGeometry = new THREE.PlaneGeometry(200, 200);
+            const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.2 });
+            const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+            plane.rotation.x = -Math.PI / 2;
+            plane.position.y = -1; // Располагаем плоскость чуть ниже модели
+            plane.receiveShadow = true; // Принимает тени
+            scene.add(plane);
+            console.log('Плоскость для теней добавлена в сцену');
 
             // Загрузка 3D-модели
             const loader = new THREE.GLTFLoader();
@@ -110,9 +133,14 @@
                     model.traverse(function(child) {
                         if (child.isMesh) {
                             if (child.material) {
-                                child.material.color.set('#D7DADE');
-                                // Если материалы используют карты или другие свойства, может потребоваться их обновление
-                                child.material.needsUpdate = true;
+                                // Проверяем, есть ли у материала карта
+                                if (child.material.map) {
+                                    child.material.map = null; // Убираем текстуру, если она есть
+                                }
+                                child.material.color.set('#D7DADE'); // Устанавливаем цвет
+                                child.material.needsUpdate = true; // Обновляем материал
+                                child.castShadow = true; // Модель отбрасывает тени
+                                child.receiveShadow = true; // Модель принимает тени (опционально)
                             }
                         }
                     });
@@ -154,7 +182,7 @@
                 mouseX = (event.clientX - windowHalfX) / windowHalfX;
                 mouseY = (event.clientY - windowHalfY) / windowHalfY;
                 // Логирование координат мыши
-                console.log(`Mouse position: X=${mouseX}, Y=${mouseY}`);
+                // console.log(`Mouse position: X=${mouseX}, Y=${mouseY}`);
             }, false);
 
             // Функция анимации
@@ -162,8 +190,8 @@
                 requestAnimationFrame(animate);
 
                 // Обновляем целевые значения вращения
-                targetX = mouseX * 0.1;
-                targetY = mouseY * 0.1;
+                targetX = mouseX * 0.5; // Увеличиваем чувствительность
+                targetY = mouseY * 0.5;
 
                 if (model) {
                     // Плавное вращение модели в сторону мыши
@@ -173,8 +201,8 @@
                     // Ограничение вращения по оси X для предотвращения переворота модели
                     model.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, model.rotation.x));
 
-                    // Логирование текущих углов поворота модели
-                    console.log(`Model rotation: X=${model.rotation.x.toFixed(2)}, Y=${model.rotation.y.toFixed(2)}`);
+                    // Логирование текущих углов поворота модели (опционально)
+                    // console.log(`Model rotation: X=${model.rotation.x.toFixed(2)}, Y=${model.rotation.y.toFixed(2)}`);
                 }
 
                 renderer.render(scene, camera);
