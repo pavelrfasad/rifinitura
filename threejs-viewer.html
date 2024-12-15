@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Viewer</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000000; /* Чёрный фон */
+            overflow: hidden;
+        }
+        #threejs-container {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="threejs-container"></div>
+
+    <!-- Подключение Three.js и GLTFLoader через CDN с атрибутом crossorigin -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.148.0/build/three.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.148.0/examples/js/loaders/GLTFLoader.js" crossorigin="anonymous"></script>
+
+    <script>
+        // Функция для инициализации сцены
+        function init() {
+            console.log('Инициализация сцены Three.js');
+
+            // Получаем контейнер
+            const container = document.getElementById('threejs-container');
+            if (!container) {
+                console.error('Контейнер для Three.js не найден!');
+                return;
+            }
+            console.log('Контейнер для Three.js найден');
+
+            // Создаём сцену
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000); // Чёрный фон
+            console.log('Сцена создана');
+
+            // Создаём камеру
+            const camera = new THREE.PerspectiveCamera(
+                75, 
+                container.clientWidth / container.clientHeight, 
+                0.1, 
+                1000
+            );
+            camera.position.set(0, 0, 5); // Отдаление камеры для обзора модели
+            console.log(`Камера создана с позицией: ${camera.position.x}, ${camera.position.y}, ${camera.position.z}`);
+
+            // Создаём рендерер
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            console.log('Рендерер создан и добавлен в контейнер');
+
+            // Добавляем освещение
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+            scene.add(ambientLight);
+            console.log('AmbientLight добавлен в сцену');
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight.position.set(10, 10, 10);
+            scene.add(directionalLight);
+            console.log('DirectionalLight добавлен в сцену');
+
+            // Добавляем вспомогательные оси
+            const axesHelper = new THREE.AxesHelper(5);
+            scene.add(axesHelper);
+            console.log('AxesHelper добавлен в сцену');
+
+            // Добавляем сетку
+            const gridHelper = new THREE.GridHelper(10, 10);
+            scene.add(gridHelper);
+            console.log('GridHelper добавлен в сцену');
+
+            // Загрузка 3D-модели
+            const loader = new THREE.GLTFLoader();
+            let model;
+
+            const modelURL = 'https://cdn.jsdelivr.net/gh/pavelrfasad/rifinitura/line.glb';
+            console.log(`Начинается загрузка модели с URL: ${modelURL}`);
+
+            loader.load(
+                modelURL,
+                function(gltf) {
+                    console.log('Модель успешно загружена');
+                    model = gltf.scene;
+                    console.log('Добавление модели в сцену');
+
+                    // Центрирование модели
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    model.position.sub(center);
+                    console.log(`Модель центрирована. Центр: (${center.x}, ${center.y}, ${center.z})`);
+
+                    // Авто-масштабирование модели
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxAxis = Math.max(size.x, size.y, size.z);
+                    model.scale.multiplyScalar(2 / maxAxis);
+                    console.log(`Модель масштабирована до: (${model.scale.x}, ${model.scale.y}, ${model.scale.z})`);
+
+                    scene.add(model);
+                    console.log('Модель добавлена в сцену');
+
+                    // Запуск анимации после загрузки модели
+                    animate();
+                },
+                function(xhr) {
+                    console.log(`Загружено ${(xhr.loaded / xhr.total * 100).toFixed(2)}% модели`);
+                },
+                function(error) {
+                    console.error('Ошибка загрузки модели:', error);
+                }
+            );
+
+            // Обработка изменения размера окна
+            window.addEventListener('resize', function() {
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                renderer.setSize(width, height);
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                console.log(`Размер рендерера обновлён: ${width}x${height}`);
+            });
+
+            // Переменные для отслеживания движения мыши
+            let mouseX = 0, mouseY = 0;
+            let targetX = 0, targetY = 0;
+
+            const windowHalfX = window.innerWidth / 2;
+            const windowHalfY = window.innerHeight / 2;
+
+            // Обработчик события движения мыши
+            document.addEventListener('mousemove', function(event) {
+                mouseX = (event.clientX - windowHalfX) / windowHalfX;
+                mouseY = (event.clientY - windowHalfY) / windowHalfY;
+                // Логирование координат мыши
+                console.log(`Mouse position: X=${mouseX}, Y=${mouseY}`);
+            }, false);
+
+            // Функция анимации
+            function animate() {
+                requestAnimationFrame(animate);
+
+                targetX = mouseX * 0.1;
+                targetY = mouseY * 0.1;
+
+                if (model) {
+                    // Плавное вращение модели в зависимости от позиции мыши
+                    model.rotation.y += 0.05 * (targetX - model.rotation.y);
+                    model.rotation.x += 0.05 * (targetY - model.rotation.x);
+
+                    // Логирование текущих углов поворота модели
+                    console.log(`Model rotation: X=${model.rotation.x.toFixed(2)}, Y=${model.rotation.y.toFixed(2)}`);
+                }
+
+                renderer.render(scene, camera);
+            }
+        }
+
+        // Проверка загрузки Three.js и GLTFLoader
+        if (typeof THREE === 'undefined') {
+            console.error('Three.js не загружен!');
+        } else if (typeof THREE.GLTFLoader === 'undefined') {
+            console.error('GLTFLoader не загружен!');
+        } else {
+            // Инициализация сцены после загрузки скриптов
+            window.onload = init;
+        }
+    </script>
+</body>
+</html>
